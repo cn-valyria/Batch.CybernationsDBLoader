@@ -38,6 +38,15 @@ namespace Repository
 
             // Execute the proc that merges the data into the main table
             await _cnDbContext.ExecuteSqlCommand("CALL update_aid_data();");
+
+            // Sometimes aid is deleted before the CN file can report that it expired, so if we do nothing, they 
+            // will end up showing as an un-expired status forever. This query will make sure that these missed 
+            // aid records get their status updated correctly whenever this happens
+            await _cnDbContext.ExecuteSqlCommand(@"
+update aid
+set status = 4
+where date < curdate() - interval 10 day
+and status <> 4;");
         }
 
         public async Task UpsertAlliances(IReadOnlyCollection<Alliance> data, string dataFileName)
