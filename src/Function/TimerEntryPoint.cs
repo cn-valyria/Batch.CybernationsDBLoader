@@ -16,78 +16,72 @@ public class TimerEntryPoint
     public TimerEntryPoint(IDataGrabber cnFileGrabber, IFileImporter cnFileImporter, IBlobManager blobManager) 
         => (_cnFileGrabber, _cnFileImporter, _blobManager) = (cnFileGrabber, cnFileImporter, blobManager);
 
-    [FunctionName(nameof(CnAlliancesFileGrabber)), Disable]
-    public async Task CnAlliancesFileGrabber(
+    [FunctionName(nameof(ImportAllianceFile))]
+    public async Task ImportAllianceFile(
         [TimerTrigger("0 0 1,13 * * *")] TimerInfo myTimer,
         [Blob("alliances", Connection = "AzureWebJobsStorage")] CloudBlobContainer outputContainer,
         ILogger log)
     {
-        log.LogInformation($"{nameof(CnAlliancesFileGrabber)} function started execution at: {DateTime.Now}");
+        log.LogInformation($"{nameof(ImportAllianceFile)} function started execution at: {DateTime.Now}");
 
-        await outputContainer.CreateIfNotExistsAsync();
+        await RunCnFileImportProcess(CnFileType.Alliances, outputContainer, _cnFileImporter.ImportAlliancesAsync, log);
 
-        var cnResponse = await _cnFileGrabber.GetTodaysFileAsync(CnFileType.Alliances, log);
-
-        var cloudBlockBlob = outputContainer.GetBlockBlobReference($"{cnResponse.FileName}.txt");
-        await cloudBlockBlob.UploadFromStreamAsync(cnResponse.DataStream);
-
-        log.LogInformation($"{nameof(CnAlliancesFileGrabber)} function completed execution at: {DateTime.Now}");
+        log.LogInformation($"{nameof(ImportAllianceFile)} function completed execution at: {DateTime.Now}");
     }
 
-    [FunctionName(nameof(CnNationsFileGrabber)), Disable]
-    public async Task CnNationsFileGrabber(
+    [FunctionName(nameof(ImportNationsFile))]
+    public async Task ImportNationsFile(
         [TimerTrigger("0 5 1,13 * * *")] TimerInfo myTimer,
         [Blob("nations", Connection = "AzureWebJobsStorage")] CloudBlobContainer outputContainer,
         ILogger log)
     {
-        log.LogInformation($"{nameof(CnNationsFileGrabber)} function started execution at: {DateTime.Now}");
+        log.LogInformation($"{nameof(ImportNationsFile)} function started execution at: {DateTime.Now}");
 
-        await outputContainer.CreateIfNotExistsAsync();
+        await RunCnFileImportProcess(CnFileType.Nations, outputContainer, _cnFileImporter.ImportNationsAsync, log);
 
-        var cnResponse = await _cnFileGrabber.GetTodaysFileAsync(CnFileType.Nations, log);
-
-        var cloudBlockBlob = outputContainer.GetBlockBlobReference($"{cnResponse.FileName}.txt");
-        await cloudBlockBlob.UploadFromStreamAsync(cnResponse.DataStream);
-
-        log.LogInformation($"{nameof(CnNationsFileGrabber)} function completed execution at: {DateTime.Now}");
+        log.LogInformation($"{nameof(ImportNationsFile)} function completed execution at: {DateTime.Now}");
     }
 
-    [FunctionName(nameof(CnAidFileGrabber))]
-    public async Task CnAidFileGrabber(
-        [TimerTrigger("0 10 1,13 * * *", RunOnStartup = true)] TimerInfo myTimer,
+    [FunctionName(nameof(ImportAidFile))]
+    public async Task ImportAidFile(
+        [TimerTrigger("0 10 1,13 * * *")] TimerInfo myTimer,
         [Blob("aid", Connection = "AzureWebJobsStorage")] CloudBlobContainer outputContainer,
         ILogger log)
     {
-        log.LogInformation($"{nameof(CnAidFileGrabber)} function started execution at: {DateTime.Now}");
+        log.LogInformation($"{nameof(ImportAidFile)} function started execution at: {DateTime.Now}");
 
-        var (fileName, dataStream) = await _cnFileGrabber.GetTodaysFileAsync(CnFileType.Aid, log);
+        await RunCnFileImportProcess(CnFileType.Aid, outputContainer, _cnFileImporter.ImportAidAsync, log);
+
+        log.LogInformation($"{nameof(ImportAidFile)} function completed execution at: {DateTime.Now}");
+    }
+
+    [FunctionName(nameof(ImportWarFile))]
+    public async Task ImportWarFile(
+        [TimerTrigger("0 15 1,13 * * *")] TimerInfo myTimer,
+        [Blob("war", Connection = "AzureWebJobsStorage")] CloudBlobContainer outputContainer,
+        ILogger log)
+    {
+        log.LogInformation($"{nameof(ImportWarFile)} function started execution at: {DateTime.Now}");
+
+        await RunCnFileImportProcess(CnFileType.War, outputContainer, _cnFileImporter.ImportWarsAsync, log);
+
+        log.LogInformation($"{nameof(ImportWarFile)} function completed execution at: {DateTime.Now}");
+    }
+
+    private async Task RunCnFileImportProcess(
+        CnFileType fileType,
+        CloudBlobContainer outputContainer,
+        Func<Stream, string, Task> fileImporterFunc,
+        ILogger log)
+    {
+        var (fileName, dataStream) = await _cnFileGrabber.GetTodaysFileAsync(fileType, log);
         log.LogInformation($"{fileName}.txt downloaded from CN.");
 
         // Upload the file first. If anything goes wrong with the import, we want the file preserved in blob storage
         await _blobManager.UploadFileAsync(outputContainer, fileName, await dataStream.CopyAsync());
         log.LogInformation($"{fileName}.txt uploaded to {outputContainer.Name} Azure blob");
 
-        await _cnFileImporter.ImportAidAsync(await dataStream.CopyAsync(), fileName);
+        await fileImporterFunc(await dataStream.CopyAsync(), fileName);
         log.LogInformation($"{fileName}.txt successfully imported to cybernations_db");
-
-        log.LogInformation($"{nameof(CnAidFileGrabber)} function completed execution at: {DateTime.Now}");
-    }
-
-    [FunctionName(nameof(CnWarFileGrabber)), Disable]
-    public async Task CnWarFileGrabber(
-        [TimerTrigger("0 15 1,13 * * *")] TimerInfo myTimer,
-        [Blob("war", Connection = "AzureWebJobsStorage")] CloudBlobContainer outputContainer,
-        ILogger log)
-    {
-        log.LogInformation($"{nameof(CnWarFileGrabber)} function started execution at: {DateTime.Now}");
-
-        await outputContainer.CreateIfNotExistsAsync();
-
-        var cnResponse = await _cnFileGrabber.GetTodaysFileAsync(CnFileType.War, log);
-
-        var cloudBlockBlob = outputContainer.GetBlockBlobReference($"{cnResponse.FileName}.txt");
-        await cloudBlockBlob.UploadFromStreamAsync(cnResponse.DataStream);
-
-        log.LogInformation($"{nameof(CnWarFileGrabber)} function completed execution at: {DateTime.Now}");
     }
 }

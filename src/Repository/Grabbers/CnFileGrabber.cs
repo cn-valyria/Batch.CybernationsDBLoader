@@ -18,13 +18,10 @@ namespace Repository.Grabbers
 
             logger.LogInformation($"Looking for a {fileType} CN file at UTC {DateTime.UtcNow}");
 
-            // Make sure we're using the CST representation of "now"
-            var cstTimeZone = TZConvert.GetTimeZoneInfo("Central Standard Time");
-            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
-
+            var now = GetExpectedFileDay();
             logger.LogInformation($"UTC time converted to {now} CST");
 
-            var fileName = $"{cnFileNameFactory(fileType)}{now.Month}{now.Day}{now.Year}{GetCnFileExtension(fileType, now)}";
+            var fileName = $"{GetCnFileName(fileType)}{now.Month}{now.Day}{now.Year}{GetCnFileExtension(fileType, now)}";
 
             logger.LogInformation($"File name: {fileName}");
 
@@ -34,7 +31,10 @@ namespace Repository.Grabbers
                 var response = await client.SendAsync(message);
 
                 if (!response.IsSuccessStatusCode)
-                    throw new Exception(await response.Content.ReadAsStringAsync());
+                {
+                    logger.LogError(await response.Content.ReadAsStringAsync());
+                    throw new Exception("CN file could not be accessed.");
+                }
 
                 using (var responseData = await response.Content.ReadAsStreamAsync())
                 using (var zip = new ZipArchive(responseData, ZipArchiveMode.Read))
@@ -51,7 +51,7 @@ namespace Repository.Grabbers
         /// <summary>
         /// Factory method to get desired file name by desired file type
         /// </summary>
-        private Func<CnFileType, string> cnFileNameFactory => fileType => fileType switch
+        private string GetCnFileName(CnFileType fileType) => fileType switch
         {
             CnFileType.Alliances => "CyberNations_SE_Alliance_Stats_",
             CnFileType.Nations => "CyberNations_SE_Nation_Stats_",
@@ -59,6 +59,19 @@ namespace Repository.Grabbers
             CnFileType.War => "CyberNations_SE_War_Stats_",
             _ => string.Empty
         };
+
+        /// <summary>
+        /// Factory method to get the day that we expect the file to have been uploaded on. 
+        /// </summary>
+        private DateTime GetExpectedFileDay()
+        {
+            // Make sure we're using the CST representation of "now"
+            var cstTimeZone = TZConvert.GetTimeZoneInfo("Central Standard Time");
+            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
+
+            // If "now" is actually before 6am, then we want yesterday's file instead of today
+            return now.Hour < 6 ? now.Date.AddDays(-1) : now.Date;
+        }
 
         /// <summary>
         /// Factory method to get the "timestamp" extension based on the current time (i.e. hour)
