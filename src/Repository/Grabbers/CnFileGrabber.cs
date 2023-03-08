@@ -12,16 +12,16 @@ namespace Repository.Grabbers
     {
         const string cnUrl = "https://www.cybernations.net";
 
+        private DateTime CstNow => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TZConvert.GetTimeZoneInfo("Central Standard Time"));
+
         public async Task<(string FileName, Stream DataStream)> GetTodaysFileAsync(CnFileType fileType, ILogger logger)
         {
             var dataStream = new MemoryStream();
 
             logger.LogInformation($"Looking for a {fileType} CN file at UTC {DateTime.UtcNow}");
+            logger.LogInformation($"UTC time converted to {CstNow} CST");
 
-            var now = GetExpectedFileDay();
-            logger.LogInformation($"UTC time converted to {now} CST");
-
-            var fileName = $"{GetCnFileName(fileType)}{now.Month}{now.Day}{now.Year}{GetCnFileExtension(fileType, now)}";
+            var fileName = $"{GetCnFileName(fileType)}{GetTodaysDateAsString()}{GetCnFileExtension(fileType)}";
 
             logger.LogInformation($"File name: {fileName}");
 
@@ -60,6 +60,12 @@ namespace Repository.Grabbers
             _ => string.Empty
         };
 
+        private string GetTodaysDateAsString()
+        {
+            var day = CstNow.Hour < 6 ? CstNow.Date.AddDays(-1) : CstNow.Date;
+            return $"{day.Month}{day.Day}{day.Year}";
+        }
+
         /// <summary>
         /// Factory method to get the day that we expect the file to have been uploaded on. 
         /// </summary>
@@ -76,7 +82,7 @@ namespace Repository.Grabbers
         /// <summary>
         /// Factory method to get the "timestamp" extension based on the current time (i.e. hour)
         /// </summary>
-        private string GetCnFileExtension(CnFileType fileType, DateTime now)
+        private string GetCnFileExtension(CnFileType fileType)
         {
             var firstPart = fileType switch
             {
@@ -87,10 +93,10 @@ namespace Repository.Grabbers
                 _ => string.Empty
             };
 
-            var lastPart = now switch
+            var lastPart = CstNow switch
             {
                 // "morning" file (i.e. after 6am CST but before 6pm CST)
-                _ when now.Hour > 6 && now.Hour < 18 => "001",
+                _ when CstNow.Hour >= 6 && CstNow.Hour <= 18 => "001",
 
                 // if it's not the "morning" file then it has to be the "evening" file
                 _ => "002"
