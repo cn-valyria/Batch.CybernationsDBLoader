@@ -20,7 +20,7 @@ public class BlobEntryPoint
     /// <summary>
     /// Blob-triggered job for uploading Nations file to CN DB
     /// </summary>
-    [FunctionName(nameof(CnNationsImporter))]
+    [FunctionName(nameof(CnNationsImporter)), Disable]
     public async Task CnNationsImporter([BlobTrigger("nations/{name}", Connection = "AzureWebJobsStorage")] Stream myBlob, string name, ILogger log)
     {
         log.LogInformation($"CnNationsImporter trigger function processing blob... \n Name:{name} \n Size: {myBlob.Length} Bytes");
@@ -59,38 +59,12 @@ public class BlobEntryPoint
     /// <summary>
     /// Blob-triggered job for uploading Aid file to CN DB
     /// </summary>
-    [FunctionName(nameof(CnAidImporter))]
-    public async Task CnAidImporter([BlobTrigger("aid/{name}", Connection = "AzureWebJobsStorage")] Stream myBlob, string name, ILogger log)
+    [FunctionName(nameof(CnAidImporter)), Disable]
+    public void CnAidImporter([BlobTrigger("aid/{name}", Connection = "AzureWebJobsStorage")] Stream myBlob, string name, ILogger log)
     {
         log.LogInformation($"CnAidImporter trigger function processing blob... \n Name:{name} \n Size: {myBlob.Length} Bytes");
 
-        // Convert CSV to data
-        var allAidData = new List<CnAid>();
-        try
-        {
-            await foreach (var fileRecord in _dataParser.Parse<CnAid>(myBlob))
-                allAidData.Add(fileRecord);
-
-            log.LogInformation($"File successfully parsed. {allAidData.Count} records found.");
-        }
-        catch (Exception e)
-        {
-            log.LogError($"Critical error encountered while parsing blob. \n Message: {e.Message}\n StackTrace: {e.StackTrace}");
-            return;
-        }
-
-        // Upload data to DB
-        try
-        {
-            await _cnDbRepository.UpsertAid(allAidData.Select(_mapper.Map<Aid>).ToList(), name);
-
-            log.LogInformation($"Data uploaded successfully.");
-        }
-        catch (Exception e)
-        {
-            log.LogError($"Critical error encountered while upserting aid data to the DB. \n Message: {e.Message}\n StackTrace: {e.StackTrace}");
-            return;
-        }
+        // Code moved to CnFileImporter
 
         log.LogInformation($"{nameof(CnAidImporter)} trigger function completed successfully!");
     }
@@ -98,7 +72,7 @@ public class BlobEntryPoint
     /// <summary>
     /// Blob-triggered job for uploading Aid file to CN DB
     /// </summary>
-    [FunctionName(nameof(CnWarImporter))]
+    [FunctionName(nameof(CnWarImporter)), Disable]
     public async Task CnWarImporter([BlobTrigger("war/{name}", Connection = "AzureWebJobsStorage")] Stream myBlob, string name, ILogger log)
     {
         log.LogInformation($"CnAidImporter trigger function processing blob... \n Name:{name} \n Size: {myBlob.Length} Bytes");
@@ -137,7 +111,7 @@ public class BlobEntryPoint
     /// <summary>
     /// Blob-triggered job for uploading Aid file to CN DB
     /// </summary>
-    [FunctionName(nameof(CnAlliancesImporter))]
+    [FunctionName(nameof(CnAlliancesImporter)), Disable]
     public async Task CnAlliancesImporter([BlobTrigger("alliances/{name}", Connection = "AzureWebJobsStorage")] Stream myBlob, string name, ILogger log)
     {
         log.LogInformation($"CnAlliancesImporter trigger function processing blob... \n Name:{name} \n Size: {myBlob.Length} Bytes");

@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace Repository.Infrastructure
 {
@@ -42,5 +44,15 @@ namespace Repository.Infrastructure
         public static bool IsUnauthorizedStatusCode(this HttpResponseMessage responseMessage) => responseMessage.StatusCode == HttpStatusCode.Unauthorized;
 
         public static bool IsNotFoundStatusCode(this HttpResponseMessage responseMessage) => responseMessage.StatusCode == HttpStatusCode.NotFound;
+
+        public static async Task<Stream> CopyAsync(this Stream stream)
+        {
+            var newStream = new MemoryStream();
+            await stream.CopyToAsync(newStream);
+            stream.Position = 0;
+            newStream.Position = 0;
+
+            return newStream;
+        }
     }
 }
